@@ -441,8 +441,7 @@
             );
         }
 
-        var texture = document.getElementById("texture").value;
-        gl.uniform1i(shaderProgram.useTexturesUniform, texture != "none");
+        gl.uniform1i(shaderProgram.useTexturesUniform, true);
 
         mat4.identity(mvMatrix);
 
@@ -460,11 +459,9 @@
         mat4.scale(mvMatrix, mvMatrix, [3.5, 3.5, 3.5]);
 
         gl.activeTexture(gl.TEXTURE0);
-        if (texture == "earth") {
-            gl.bindTexture(gl.TEXTURE_2D, earthTexture);
-        } else if (texture == "galvanized") {
+
             gl.bindTexture(gl.TEXTURE_2D, galvanizedTexture);
-        }
+        
         gl.uniform1i(shaderProgram.samplerUniform, 0);
 
         gl.uniform1f(shaderProgram.materialShininessUniform, parseFloat(document.getElementById("shininess").value));
@@ -547,14 +544,6 @@
 
     <input type="checkbox" id="specular" checked /> Show specular highlight<br/>
     <input type="checkbox" id="lighting" checked /> Use lighting<br/>
-
-    Texture:
-    <select id="texture">
-        <option value="none">None</option>
-        <option selected value="galvanized">Galvanized</option>
-        <option value="earth">Earth</option>
-    </select>
-    <br/>
 
 
     <h2>Material:</h2>

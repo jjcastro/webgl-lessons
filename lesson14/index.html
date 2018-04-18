@@ -206,15 +206,9 @@
         galvanizedTexture.image.onload = function () {
             handleLoadedTexture(galvanizedTexture)
         };
-        galvanizedTexture.image.src = "arroway.de_metal+structure+06_d100_flat.jpg";
+        galvanizedTexture.image.src = "coca.gif";
     }
 
-    var zoom = -12;
-    var tiltX = -25;
-    var tiltY = 0;
-    var perspectiveA = 45;
-
-    var spin = 0;
 
     var mvMatrix = mat4.create();
     var mvMatrixStack = [];
@@ -251,107 +245,166 @@
         return degrees * Math.PI / 180;
     }
 
+    var mouseDown = false;
+    var lastMouseX = null;
+    var lastMouseY = null;
 
-    var teapotVertexPositionBuffer;
-    var teapotVertexNormalBuffer;
-    var teapotVertexTextureCoordBuffer;
-    var teapotVertexIndexBuffer;
+    var moonRotationMatrix = mat4.create();
+    mat4.identity(moonRotationMatrix);
 
-    function handleLoadedTeapot(teapotData) {
-        teapotVertexNormalBuffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexNormalBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(teapotData.vertexNormals), gl.STATIC_DRAW);
-        teapotVertexNormalBuffer.itemSize = 3;
-        teapotVertexNormalBuffer.numItems = teapotData.vertexNormals.length / 3;
+    function handleMouseDown(event) {
+        mouseDown = true;
+        lastMouseX = event.clientX;
+        lastMouseY = event.clientY;
+    }
 
-        teapotVertexTextureCoordBuffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexTextureCoordBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(teapotData.vertexTextureCoords), gl.STATIC_DRAW);
-        teapotVertexTextureCoordBuffer.itemSize = 2;
-        teapotVertexTextureCoordBuffer.numItems = teapotData.vertexTextureCoords.length / 2;
+    function handleMouseUp(event) {
+        mouseDown = false;
+    }
 
-        teapotVertexPositionBuffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexPositionBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(teapotData.vertexPositions), gl.STATIC_DRAW);
-        teapotVertexPositionBuffer.itemSize = 3;
-        teapotVertexPositionBuffer.numItems = teapotData.vertexPositions.length / 3;
 
-        teapotVertexIndexBuffer = gl.createBuffer();
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, teapotVertexIndexBuffer);
-        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(teapotData.indices), gl.STATIC_DRAW);
-        teapotVertexIndexBuffer.itemSize = 1;
-        teapotVertexIndexBuffer.numItems = teapotData.indices.length;
+    function handleMouseMove(event) {
+        if (!mouseDown) {
+            return;
+        }
+        var newX = event.clientX;
+        var newY = event.clientY;
+
+        var deltaX = newX - lastMouseX;
+        var newRotationMatrix = mat4.create();
+        mat4.identity(newRotationMatrix);
+        // Update: mat4.rotate(newRotationMatrix, degToRad(deltaX / 10), [0, 1, 0]); mat4.rotate() API has changed to mat4.rotate(out, a, rad, axis)
+        // where out is the receiving matrix and a is the matrix to rotate.
+        mat4.rotate(newRotationMatrix, newRotationMatrix, degToRad(deltaX / 10), [0, 1, 0]);
+
+        var deltaY = newY - lastMouseY;
+        mat4.rotate(newRotationMatrix, newRotationMatrix, degToRad(deltaY / 10), [1, 0, 0]);
+
+        // Update: mat4.multiply(newRotationMatrix, moonRotationMatrix, moonRotationMatrix); API has changed.
+        mat4.multiply(moonRotationMatrix, newRotationMatrix, moonRotationMatrix);
+
+        lastMouseX = newX;
+        lastMouseY = newY;
+    }
+
+
+    var moonVertexPositionBuffer;
+    var moonVertexNormalBuffer;
+    var moonVertexTextureCoordBuffer;
+    var moonVertexIndexBuffer;
+
+
+    function initBuffers() {
+        var latitudeBands = [2.3, 2.3, 2.3, 2, -2,-2.3, -2.3, -2.3];
+        var longitudeBands = 30;
+        var radii = [0, 1.2, 1.2, 1.5, 1.5, 1.2, 1.2, 0]
+
+        var vertexPositionData = [];
+        var normalData = [];
+        var textureCoordData = [];
+        for (var i=0; i <= latitudeBands.length; i++) {
+            for (var j=0; j <= longitudeBands; j++) {
+                var phi = j * 2 * Math.PI / longitudeBands;
+                var sinPhi = Math.sin(phi);
+                var cosPhi = Math.cos(phi);
+
+                var x = cosPhi;
+                var y = latitudeBands[i];
+                var z = sinPhi;
+
+                var u = 0;
+                var v = 0;
+
+                switch (i) {
+                    case 0:
+                        u = 0.25;
+                        v = 0.75;
+                        break;
+                    case 1:
+                        u = cosPhi * 0.25 + 0.25;
+                        v = sinPhi * 0.25 + 0.75;
+                        break;
+                    case latitudeBands.length - 2:
+                        u = cosPhi * 0.25 + 0.75;
+                        v = sinPhi * 0.25 + 0.75;
+                        break;
+                    case latitudeBands.length - 1:
+                        u = 0.75;
+                        v = 0.75;
+                        break;
+                    default:
+                        u = 1 - (j / longitudeBands);
+                        v = latitudeBands[i] / 9.2 + 0.25;
+                }
+                
+                normalData.push(x);
+                normalData.push(y);
+                normalData.push(z);
+                textureCoordData.push(u);
+                textureCoordData.push(v);
+                vertexPositionData.push(radii[i] * x);
+                vertexPositionData.push(y);
+                vertexPositionData.push(radii[i] * z);
+            }
+        }
+
+        var indexData = [];
+        for (var lat=0; lat < latitudeBands.length; lat++) {
+            for (var long=0; long < longitudeBands; long++) {
+                var first = (lat * (longitudeBands + 1)) + long;
+                var second = first + longitudeBands + 1;
+                indexData.push(first);
+                indexData.push(second);
+                indexData.push(first + 1);
+
+                indexData.push(second);
+                indexData.push(second + 1);
+                indexData.push(first + 1);
+            }
+        }
+
+        moonVertexNormalBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, moonVertexNormalBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(normalData), gl.STATIC_DRAW);
+        moonVertexNormalBuffer.itemSize = 3;
+        moonVertexNormalBuffer.numItems = normalData.length / 3;
+
+        moonVertexTextureCoordBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, moonVertexTextureCoordBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(textureCoordData), gl.STATIC_DRAW);
+        moonVertexTextureCoordBuffer.itemSize = 2;
+        moonVertexTextureCoordBuffer.numItems = textureCoordData.length / 2;
+
+        moonVertexPositionBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, moonVertexPositionBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexPositionData), gl.STATIC_DRAW);
+        moonVertexPositionBuffer.itemSize = 3;
+        moonVertexPositionBuffer.numItems = vertexPositionData.length / 3;
+
+        moonVertexIndexBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, moonVertexIndexBuffer);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indexData), gl.STATIC_DRAW);
+        moonVertexIndexBuffer.itemSize = 1;
+        moonVertexIndexBuffer.numItems = indexData.length;
 
         document.getElementById("loadingtext").textContent = "";
     }
 
 
-    function loadTeapot() {
-        var request = new XMLHttpRequest();
-        request.open("GET", "Teapot.json");
-        request.onreadystatechange = function () {
-            if (request.readyState == 4) {
-                handleLoadedTeapot(JSON.parse(request.responseText));
-            }
-        };
-        request.send();
-    }
-
-
     var teapotAngle = 180;
-
-var spin = 0;
-
-function Teapot(startingAngle, rotationSpeed, startingSine) {
-    this.angle = startingAngle;
-    this.dist = 2;
-    this.rotationSpeed = rotationSpeed;
-    this.startingSine = startingSine;
-
-    // Set the colors to a starting value.
-    // this.randomiseColors();
-}
-
-Teapot.prototype.draw = function(spin) {
-    mvPushMatrix();
-
-    mat4.rotate(mvMatrix, mvMatrix, degToRad(this.angle), [0.0, 1.0, 0.0]);
-    console.log(spin);
-    mat4.translate(mvMatrix, mvMatrix, [this.dist, Math.sin(degToRad(spin + this.startingSine)), 0.0]);
+    var omg = 0;
 
 
-    // All stars spin around the Z axis at the same rate
-    mat4.rotate(mvMatrix, mvMatrix, degToRad(spin), [0.0, 0.0, 1.0]);
-    mat4.scale(mvMatrix, mvMatrix, [0.15, 0.15, 0.15]);
+    function drawScene() {
+        gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-    drawTeapot();
-    
-    mvPopMatrix();
-};
-
-
-var speed = 200 / 1000;
-Teapot.prototype.animate = function (elapsedTime) {
-    this.angle += speed * elapsedTime;
-};
-
-var teapots = [];
-
-function initWorldObjects() {
-    var numObj = 30;
-
-    for (var i=0; i < numObj; i++) {
-        teapots.push(new Teapot(i * (360/numObj), i / numObj, i * 50));
-    }
-}
-
-
-    function drawTeapot() {
-
-        if (teapotVertexPositionBuffer == null || teapotVertexNormalBuffer == null || teapotVertexTextureCoordBuffer == null || teapotVertexIndexBuffer == null) {
+        if (moonVertexPositionBuffer == null || moonVertexNormalBuffer == null || moonVertexTextureCoordBuffer == null || moonVertexIndexBuffer == null) {
             return;
         }
 
+        // Update: mat4.perspective(45, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0, pMatrix); mat4.perspective() API has changed.
+        mat4.perspective (pMatrix, 45.0, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0);
 
         var specularHighlights = document.getElementById("specular").checked;
         gl.uniform1i(shaderProgram.showSpecularHighlightsUniform, specularHighlights);
@@ -368,9 +421,9 @@ function initWorldObjects() {
 
             gl.uniform3f(
                 shaderProgram.pointLightingLocationUniform,
-                parseFloat(document.getElementById("lightPositionX").value),
-                parseFloat(document.getElementById("lightPositionY").value),
-                parseFloat(document.getElementById("lightPositionZ").value)
+                    parseFloat(document.getElementById("lightPositionX").value),
+                    parseFloat(document.getElementById("lightPositionY").value),
+                    parseFloat(document.getElementById("lightPositionZ").value)
             );
 
             gl.uniform3f(
@@ -391,16 +444,20 @@ function initWorldObjects() {
         var texture = document.getElementById("texture").value;
         gl.uniform1i(shaderProgram.useTexturesUniform, texture != "none");
 
-        // mat4.identity(mvMatrix);
+        mat4.identity(mvMatrix);
 
         // Update: mat4.translate(mvMatrix, [0, 0, -40]); mat4.translate() API has changed to mat4.translate(out, a, v)
         // where out is the receiving matrix, a is the matrix to translate, and v is the vector to translate by. z and
         // DOM element "lightPositionZ" altered to approximate original scene.
-        // mat4.translate(mvMatrix, mvMatrix, [0, 0, -32]);
+
+        mat4.translate(mvMatrix, mvMatrix, [0, 0, -32]);
+
+        mat4.multiply(mvMatrix, mvMatrix, moonRotationMatrix);
         // Update: mat4.rotate(mvMatrix, degToRad(23.4), [1, 0, -1]); mat4.rotate() API has changed to mat4.rotate(out, a, rad, axis)
         // where out is the receiving matrix and a is the matrix to rotate.
-        // mat4.rotate(mvMatrix, mvMatrix, degToRad(23.4), [1, 0, -1]);
-        // mat4.rotate(mvMatrix, mvMatrix, degToRad(teapotAngle), [0, 1, 0]);
+        mat4.rotate(mvMatrix, mvMatrix, degToRad(23.4), [1, 0, -1]);
+        mat4.rotate(mvMatrix, mvMatrix, degToRad(-teapotAngle), [0, 1, 0]);
+        mat4.scale(mvMatrix, mvMatrix, [3.5, 3.5, 3.5]);
 
         gl.activeTexture(gl.TEXTURE0);
         if (texture == "earth") {
@@ -412,40 +469,18 @@ function initWorldObjects() {
 
         gl.uniform1f(shaderProgram.materialShininessUniform, parseFloat(document.getElementById("shininess").value));
 
-        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexPositionBuffer);
-        gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, teapotVertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ARRAY_BUFFER, moonVertexPositionBuffer);
+        gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, moonVertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
 
-        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexTextureCoordBuffer);
-        gl.vertexAttribPointer(shaderProgram.textureCoordAttribute, teapotVertexTextureCoordBuffer.itemSize, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ARRAY_BUFFER, moonVertexTextureCoordBuffer);
+        gl.vertexAttribPointer(shaderProgram.textureCoordAttribute, moonVertexTextureCoordBuffer.itemSize, gl.FLOAT, false, 0, 0);
 
-        gl.bindBuffer(gl.ARRAY_BUFFER, teapotVertexNormalBuffer);
-        gl.vertexAttribPointer(shaderProgram.vertexNormalAttribute, teapotVertexNormalBuffer.itemSize, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ARRAY_BUFFER, moonVertexNormalBuffer);
+        gl.vertexAttribPointer(shaderProgram.vertexNormalAttribute, moonVertexNormalBuffer.itemSize, gl.FLOAT, false, 0, 0);
 
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, teapotVertexIndexBuffer);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, moonVertexIndexBuffer);
         setMatrixUniforms();
-
-        gl.drawElements(gl.TRIANGLES, teapotVertexIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0);
-        console.log("drawing");
-    }
-
-
-    function drawScene() {
-        gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
-        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-        mat4.perspective (pMatrix, 45, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0);
-
-        mat4.identity(mvMatrix);
-        mat4.translate(mvMatrix, mvMatrix, [0.0, 0.0, zoom]);
-        mat4.rotate(mvMatrix, mvMatrix, degToRad(tiltX), [1.0, 0.0, 0.0]);
-        mat4.rotate(mvMatrix, mvMatrix, degToRad(tiltY), [0.0, 1.0, 0.0]);
-
-        for (var i in teapots) {
-            spin += 0.1;
-            teapots[i].draw(spin);
-            // console.log(a);
-        }
-
+        gl.drawElements(gl.TRIANGLES, moonVertexIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0);
     }
 
 
@@ -456,9 +491,6 @@ function initWorldObjects() {
         if (lastTime != 0) {
             var elapsed = timeNow - lastTime;
 
-            for (var i in teapots) {
-                teapots[i].animate(elapsed);
-            }
             teapotAngle += 0.05 * elapsed;
         }
         lastTime = timeNow;
@@ -475,13 +507,16 @@ function initWorldObjects() {
     function webGLStart() {
         var canvas = document.getElementById("lesson14-canvas");
         initGL(canvas);
-        initWorldObjects();
         initShaders();
         initTextures();
-        loadTeapot();
+        initBuffers();
 
         gl.clearColor(0.0, 0.0, 0.0, 1.0);
         gl.enable(gl.DEPTH_TEST);
+
+        canvas.onmousedown = handleMouseDown;
+        document.onmouseup = handleMouseUp;
+        document.onmousemove = handleMouseMove;
 
         tick();
     }
@@ -504,7 +539,6 @@ function initWorldObjects() {
 
 
 <body onload="webGLStart();">
-    <a href="http://learningwebgl.com/blog/?p=1658">&lt;&lt; Back to Lesson 14</a><br />
 
     <canvas id="lesson14-canvas" style="border: none;" width="500" height="500"></canvas>
 
@@ -569,10 +603,6 @@ function initWorldObjects() {
     </table>
     <br/>
 
-    Galvanized texture courtesy of <a href="http://www.arroway-textures.com/">Arroway Textures</a>.<br/>
-    Earth texture courtesy of <a href="http://www.esa.int/esaEO/SEMGSY2IU7E_index_0.html">the European Space Agency/Envisat</a>.<br/><br/>
-
-    <a href="http://learningwebgl.com/blog/?p=1658">&lt;&lt; Back to Lesson 14</a><br />
 </body>
 
 </html>

@@ -166,7 +166,7 @@
             handleLoadedTexture(moonTexture)
         };
 
-        moonTexture.image.src = "moon.gif";
+        moonTexture.image.src = "coca.gif";
     }
 
 
@@ -257,45 +257,65 @@
     var moonVertexTextureCoordBuffer;
     var moonVertexIndexBuffer;
 
+
     function initBuffers() {
-        var latitudeBands = 30;
+        var latitudeBands = [2.3, 2.3, 2.3, 2, -2,-2.3, -2.3, -2.3];
         var longitudeBands = 30;
-        var radius = 2;
+        var radii = [0, 1.2, 1.2, 1.5, 1.5, 1.2, 1.2, 0]
 
         var vertexPositionData = [];
         var normalData = [];
         var textureCoordData = [];
-        for (var latNumber=0; latNumber <= latitudeBands; latNumber++) {
-            var theta = latNumber * Math.PI / latitudeBands;
-            var sinTheta = Math.sin(theta);
-            var cosTheta = Math.cos(theta);
-
-            for (var longNumber=0; longNumber <= longitudeBands; longNumber++) {
-                var phi = longNumber * 2 * Math.PI / longitudeBands;
+        for (var i=0; i <= latitudeBands.length; i++) {
+            for (var j=0; j <= longitudeBands; j++) {
+                var phi = j * 2 * Math.PI / longitudeBands;
                 var sinPhi = Math.sin(phi);
                 var cosPhi = Math.cos(phi);
 
-                var x = cosPhi * sinTheta;
-                var y = cosTheta;
-                var z = sinPhi * sinTheta;
-                var u = 1 - (longNumber / longitudeBands);
-                var v = 1 - (latNumber / latitudeBands);
+                var x = cosPhi;
+                var y = latitudeBands[i];
+                var z = sinPhi;
 
+                var u = 0;
+                var v = 0;
+
+                switch (i) {
+                    case 0:
+                        u = 0.25;
+                        v = 0.75;
+                        break;
+                    case 1:
+                        u = cosPhi * 0.25 + 0.25;
+                        v = sinPhi * 0.25 + 0.75;
+                        break;
+                    case latitudeBands.length - 2:
+                        u = cosPhi * 0.25 + 0.75;
+                        v = sinPhi * 0.25 + 0.75;
+                        break;
+                    case latitudeBands.length - 1:
+                        u = 0.75;
+                        v = 0.75;
+                        break;
+                    default:
+                        u = 1 - (j / longitudeBands);
+                        v = latitudeBands[i] / 9.2 + 0.25;
+                }
+                
                 normalData.push(x);
                 normalData.push(y);
                 normalData.push(z);
                 textureCoordData.push(u);
                 textureCoordData.push(v);
-                vertexPositionData.push(radius * x);
-                vertexPositionData.push(radius * y);
-                vertexPositionData.push(radius * z);
+                vertexPositionData.push(radii[i] * x);
+                vertexPositionData.push(y);
+                vertexPositionData.push(radii[i] * z);
             }
         }
 
         var indexData = [];
-        for (var latNumber=0; latNumber < latitudeBands; latNumber++) {
-            for (var longNumber=0; longNumber < longitudeBands; longNumber++) {
-                var first = (latNumber * (longitudeBands + 1)) + longNumber;
+        for (var lat=0; lat < latitudeBands.length; lat++) {
+            for (var long=0; long < longitudeBands; long++) {
+                var first = (lat * (longitudeBands + 1)) + long;
                 var second = first + longitudeBands + 1;
                 indexData.push(first);
                 indexData.push(second);
@@ -376,7 +396,7 @@
         // Update: mat4.translate(mvMatrix, [0, 0, -6]); mat4.translate() API has changed to mat4.translate(out, a, v)
         // where out is the receiving matrix, a is the matrix to translate, and v is the vector to translate by. z altered to
         // approximate original scene.
-        mat4.translate(mvMatrix, mvMatrix, [0, 0, -4.7]);
+        mat4.translate(mvMatrix, mvMatrix, [0, 0, -8]);
 
         mat4.multiply(mvMatrix, mvMatrix, moonRotationMatrix);
 

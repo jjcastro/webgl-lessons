@@ -152,7 +152,6 @@
     var currentlyPressedKeys = {};
     function handleKeyDown(event) {
         currentlyPressedKeys[event.keyCode] = true;
-        console.log(event.keyCode);
     }
     function handleKeyUp(event) {
         currentlyPressedKeys[event.keyCode] = false;
@@ -182,14 +181,6 @@
         if (currentlyPressedKeys[40]) {
             // 2 key
             tiltX += 2;
-        }
-        if (currentlyPressedKeys[81]) {
-            // Q key
-            perspectiveA -= 0.1;
-        }
-        if (currentlyPressedKeys[87]) {
-            // W key
-            perspectiveA += 0.1;
         }
     }
 
@@ -361,11 +352,12 @@
     const PYRAMID = "PYRAMID";
     const CUBE = "CUBE";
 
-function MovElement(startingDistance, rotationSpeed, shape) {
-    this.angle = 0;
-    this.dist = startingDistance;
+function MovElement(startingAngle, rotationSpeed, shape, startingSine) {
+    this.angle = startingAngle;
+    this.dist = 2;
     this.rotationSpeed = rotationSpeed;
     this.shape = shape;
+    this.startingSine = startingSine;
 
     // Set the colors to a starting value.
     // this.randomiseColors();
@@ -376,7 +368,9 @@ function MovElement(startingDistance, rotationSpeed, shape) {
 
 
         mat4.rotate(mvMatrix, mvMatrix, degToRad(this.angle), [0.0, 1.0, 0.0]);
-        mat4.translate(mvMatrix, mvMatrix, [this.dist, 0.0, 0.0]);
+        console.log(spin);
+        mat4.translate(mvMatrix, mvMatrix, [this.dist, Math.sin(degToRad(spin + this.startingSine)), 0.0]);
+
 
         // All stars spin around the Z axis at the same rate
         mat4.rotate(mvMatrix, mvMatrix, degToRad(spin), [0.0, 0.0, 1.0]);
@@ -394,14 +388,14 @@ function MovElement(startingDistance, rotationSpeed, shape) {
 
 var speed = 200 / 1000;
 MovElement.prototype.animate = function (elapsedTime) {
-    this.angle += this.rotationSpeed * speed * elapsedTime;
+    this.angle += speed * elapsedTime;
 
     // Decrease the distance, resetting the shape to the outside of
     // the spiral if it's at the center.
-    this.dist -= 0.01 * speed * elapsedTime;
-    if (this.dist < 0.1) {
-        this.dist += 5.0;
-    }
+    // this.dist -= 0.01 * speed * elapsedTime;
+    // if (this.dist < 0.1) {
+    //     this.dist += 5.0;
+    // }
 };
 
 
@@ -412,7 +406,7 @@ function initWorldObjects() {
     var numObj = 30;
 
     for (var i=0; i < numObj; i++) {
-        objects.push(new MovElement((i / numObj) * 15.0, i / numObj, i % 2 == 0 ? PYRAMID : CUBE));
+        objects.push(new MovElement(i * (360/numObj), i / numObj, i % 2 == 0 ? PYRAMID : CUBE, i * 100));
     }
 }
 
@@ -424,12 +418,12 @@ function drawScene() {
     mat4.perspective (pMatrix, perspectiveA, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0);
 
     mat4.identity(mvMatrix);
-    console.log(tiltX);
     mat4.translate(mvMatrix, mvMatrix, [0.0, 0.0, zoom]);
     mat4.rotate(mvMatrix, mvMatrix, degToRad(tiltX), [1.0, 0.0, 0.0]);
     mat4.rotate(mvMatrix, mvMatrix, degToRad(tiltY), [0.0, 1.0, 0.0]);
 
     for (var i in objects) {
+        spin += 0.1;
         objects[i].draw(spin);
     }
 

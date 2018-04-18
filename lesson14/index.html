@@ -209,6 +209,12 @@
         galvanizedTexture.image.src = "arroway.de_metal+structure+06_d100_flat.jpg";
     }
 
+    var zoom = -12;
+    var tiltX = -25;
+    var tiltY = 0;
+    var perspectiveA = 45;
+
+    var spin = 0;
 
     var mvMatrix = mat4.create();
     var mvMatrixStack = [];
@@ -294,17 +300,58 @@
 
     var teapotAngle = 180;
 
+var spin = 0;
 
-    function drawScene() {
-        gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
-        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+function Teapot(startingAngle, rotationSpeed, startingSine) {
+    this.angle = startingAngle;
+    this.dist = 2;
+    this.rotationSpeed = rotationSpeed;
+    this.startingSine = startingSine;
+
+    // Set the colors to a starting value.
+    // this.randomiseColors();
+}
+
+Teapot.prototype.draw = function(spin) {
+    mvPushMatrix();
+
+    mat4.rotate(mvMatrix, mvMatrix, degToRad(this.angle), [0.0, 1.0, 0.0]);
+    console.log(spin);
+    mat4.translate(mvMatrix, mvMatrix, [this.dist, Math.sin(degToRad(spin + this.startingSine)), 0.0]);
+
+
+    // All stars spin around the Z axis at the same rate
+    mat4.rotate(mvMatrix, mvMatrix, degToRad(spin), [0.0, 0.0, 1.0]);
+    mat4.scale(mvMatrix, mvMatrix, [0.15, 0.15, 0.15]);
+
+    drawTeapot();
+    
+    mvPopMatrix();
+};
+
+
+var speed = 200 / 1000;
+Teapot.prototype.animate = function (elapsedTime) {
+    this.angle += speed * elapsedTime;
+};
+
+var teapots = [];
+
+function initWorldObjects() {
+    var numObj = 30;
+
+    for (var i=0; i < numObj; i++) {
+        teapots.push(new Teapot(i * (360/numObj), i / numObj, i * 50));
+    }
+}
+
+
+    function drawTeapot() {
 
         if (teapotVertexPositionBuffer == null || teapotVertexNormalBuffer == null || teapotVertexTextureCoordBuffer == null || teapotVertexIndexBuffer == null) {
             return;
         }
 
-        // Update: mat4.perspective(45, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0, pMatrix); mat4.perspective() API has changed.
-        mat4.perspective (pMatrix, 45.0, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0);
 
         var specularHighlights = document.getElementById("specular").checked;
         gl.uniform1i(shaderProgram.showSpecularHighlightsUniform, specularHighlights);
@@ -344,16 +391,16 @@
         var texture = document.getElementById("texture").value;
         gl.uniform1i(shaderProgram.useTexturesUniform, texture != "none");
 
-        mat4.identity(mvMatrix);
+        // mat4.identity(mvMatrix);
 
         // Update: mat4.translate(mvMatrix, [0, 0, -40]); mat4.translate() API has changed to mat4.translate(out, a, v)
         // where out is the receiving matrix, a is the matrix to translate, and v is the vector to translate by. z and
         // DOM element "lightPositionZ" altered to approximate original scene.
-        mat4.translate(mvMatrix, mvMatrix, [0, 0, -32]);
+        // mat4.translate(mvMatrix, mvMatrix, [0, 0, -32]);
         // Update: mat4.rotate(mvMatrix, degToRad(23.4), [1, 0, -1]); mat4.rotate() API has changed to mat4.rotate(out, a, rad, axis)
         // where out is the receiving matrix and a is the matrix to rotate.
-        mat4.rotate(mvMatrix, mvMatrix, degToRad(23.4), [1, 0, -1]);
-        mat4.rotate(mvMatrix, mvMatrix, degToRad(teapotAngle), [0, 1, 0]);
+        // mat4.rotate(mvMatrix, mvMatrix, degToRad(23.4), [1, 0, -1]);
+        // mat4.rotate(mvMatrix, mvMatrix, degToRad(teapotAngle), [0, 1, 0]);
 
         gl.activeTexture(gl.TEXTURE0);
         if (texture == "earth") {
@@ -376,7 +423,29 @@
 
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, teapotVertexIndexBuffer);
         setMatrixUniforms();
+
         gl.drawElements(gl.TRIANGLES, teapotVertexIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0);
+        console.log("drawing");
+    }
+
+
+    function drawScene() {
+        gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        mat4.perspective (pMatrix, 45, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0);
+
+        mat4.identity(mvMatrix);
+        mat4.translate(mvMatrix, mvMatrix, [0.0, 0.0, zoom]);
+        mat4.rotate(mvMatrix, mvMatrix, degToRad(tiltX), [1.0, 0.0, 0.0]);
+        mat4.rotate(mvMatrix, mvMatrix, degToRad(tiltY), [0.0, 1.0, 0.0]);
+
+        for (var i in teapots) {
+            spin += 0.1;
+            teapots[i].draw(spin);
+            // console.log(a);
+        }
+
     }
 
 
@@ -387,6 +456,9 @@
         if (lastTime != 0) {
             var elapsed = timeNow - lastTime;
 
+            for (var i in teapots) {
+                teapots[i].animate(elapsed);
+            }
             teapotAngle += 0.05 * elapsed;
         }
         lastTime = timeNow;
@@ -403,6 +475,7 @@
     function webGLStart() {
         var canvas = document.getElementById("lesson14-canvas");
         initGL(canvas);
+        initWorldObjects();
         initShaders();
         initTextures();
         loadTeapot();
